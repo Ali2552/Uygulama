@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="tr" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gelir-Gider Takip</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    .balance-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .balance-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+    
+    .btn-primary {
+      transition: all 0.2s ease;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .transaction-item {
+      transition: background-color 0.2s ease;
+    }
+    
+    .transaction-item:hover {
+      background-color: rgba(0,0,0,0.02);
+    }
+    
+    .tab-button {
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    
+    .tab-button.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      border-radius: 3px 3px 0 0;
+    }
+
+    .toast {
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script>
+    // Firebase başlatma kontrol ve yardımcı
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0_BVM_Kbs2a2WRPB2BJrsBgyEFP6guWU",
+      authDomain: "site-54f54.firebaseapp.com",
+      projectId: "site-54f54",
+      storageBucket: "site-54f54.firebasestorage.app",
+      messagingSenderId: "1077502171102",
+      appId: "1:1077502171102:web:66c13e66af92c5ba5c6f4f",
+      measurementId: "G-8J78GQ5WKH"
+    };
+
+    window.firebaseReady = false;
+    window.firebaseError = null;
+    let firebaseInitialized = false;
+
+    // Firebase hazır mı kontrol et - hemen ve periyodik
+    const checkFirebase = () => {
+      if (firebaseInitialized) return window.firebaseReady;
+      
+      if (typeof firebase !== 'undefined' && firebase.apps) {
+        console.log('✅ Firebase SDK yüklendi, başlatılıyor...');
+        try {
+          if (firebase.apps.length === 0) {
+            firebase.initializeApp(firebaseConfig);
+          }
+          window.firebaseReady = true;
+          window.firebaseError = null;
+          firebaseInitialized = true;
+          console.log('✅ Firebase başlatıldı ve hazır');
+          return true;
+        } catch (e) {
+          if (e.code !== 'app/duplicate-app') {
+            window.firebaseError = e.message;
+            console.error('❌ Firebase başlatma hatası:', e.message);
+          } else {
+            window.firebaseReady = true;
+            firebaseInitialized = true;
+            console.log('✅ Firebase zaten başlatılmış');
+          }
+        }
+      } else {
+        window.firebaseError = 'Firebase SDK hala yüklenmedi';
+        console.log('⏳ Firebase SDK bekleniyor...');
+      }
+      return window.firebaseReady;
+    };
+
+    // Başlangıçta kontrol et
+    checkFirebase();
+
+    // Sayfa yüklenirse tekrar kontrol et
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(checkFirebase, 100);
+      });
+    } else {
+      setTimeout(checkFirebase, 100);
+    }
+
+    // Periyodik olarak kontrol et (ilk 5 saniye boyunca)
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      if (checkFirebase() || checkCount > 10) {
+        clearInterval(checkInterval);
+      }
+    }, 500);
+
+    // Google Sign-In fonksiyonu
+    window.googleSignIn = async () => {
+      const errDiv = document.getElementById('googleErrorMsg');
+      if (errDiv) errDiv.textContent = '';
+
+      // Firebase hazır mı kontrol et
+      if (!window.firebaseReady || typeof firebase === 'undefined') {
+        const msg = 'Firebase hazır değil: ' + (window.firebaseError || 'SDK yüklenmedi');
+        console.error('❌', msg);
+        if (errDiv) {
+          errDiv.textContent = msg;
+          errDiv.style.display = 'block';
+        }
+        alert(msg + '\n\nSayfayı yenilemeden 3 saniye bekleyip tekrar deneyin.');
+        return;
+      }
+
+      const auth = firebase.auth();
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ 'prompt': 'select_account' });
+
+
+      try {
+        const result = await auth.signInWithPopup(provider);
+        console.log('✅ Google giriş başarılı:', result.user.email);
+        isLoggedIn = true;
+        currentUserUID = result.user.uid;
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('userDisplayName', result.user.displayName || result.user.email);
+        localStorage.setItem('userUID', result.user.uid);
+        
+        // Compat API'de access token'ı almanın doğru yolu
+        try {
+          const response = await result.user.getIdTokenResult();
+          const claims = response.claims;
+          if (claims) {
+            console.log('✅ Token claims algılandı');
+          }
+          
+          // Firebase Auth token değil, OAuth token gerekli - farklı yöntem
+          const additionalUserInfo = result.additionalUserInfo;
+          if (additionalUserInfo && additionalUserInfo.profile && additionalUserInfo.profile.email) {
+            // OAuth2 tarafından sağlanan scope'lar sonuç içinde
+            console.log('✅ Google profile info:', additionalUserInfo.profile.email);
+          }
+          
+
+        } catch (tokenErr) {
+          console.warn('⚠️ Token alma hatası:', tokenErr.message);
+        }
+        
+        if (typeof window.showToast === 'function') {
+          window.showToast('Google ile giriş başarılı! Hoş geldiniz ' + (result.user.displayName || ''), 'success');
+
+        }
+        if (typeof window.renderApp === 'function') window.renderApp();
+      } catch (err) {
+        console.error('❌ Google giriş hatası:', err.code, err.message);
+        
+        // Popup bloke edildiyse redirect dene
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+          try {
+            console.log('🔄 Redirect yöntemi deneniyor...');
+            if (typeof window.showToast === 'function') {
+              window.showToast('Popup engellendi, yönlendirme deneniyor...', 'error');
+            }
+            await auth.signInWithRedirect(provider);
+          } catch (err2) {
+            console.error('Redirect hatası:', err2.message);
+            if (typeof window.showToast === 'function') {
+              window.showToast('Yönlendirme başarısız: ' + err2.code, 'error');
+            }
+          }
+        } else {
+          if (errDiv) {
+            errDiv.textContent = 'Kod: ' + err.code + '\nMesaj: ' + err.message + '\n\nF12 Console için kontrol edin.';
+            errDiv.style.display = 'block';
+          }
+          if (typeof window.showToast === 'function') {
+            window.showToast('Giriş hatası: ' + err.code, 'error');
+          }
+        }
+      }
+    };
+
+    // Redirect sonucunu kontrol et ve token'ı restore et
+    if (firebase && firebase.auth) {
+      firebase.auth().onAuthStateChanged(user => {
+        if (user) {
+          console.log('✅ Firebase oturumu algılandı:', user.email);
+          isLoggedIn = true;
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('userDisplayName', user.displayName || user.email);
+          currentUserUID = user.uid;
+          loadDataFromFirestore();
+          
+          if (typeof window.renderApp === 'function') window.renderApp();
+        }
+      });
+    }
+
+    // Firebase çıkış fonksiyonu
+    window.firebaseSignOut = async () => {
+      try {
+        if (firebase && firebase.auth) {
+          await firebase.auth().signOut();
+          console.log('✅ Firebase çıkışı başarılı');
+          localStorage.setItem('isLoggedIn', 'false');
+          localStorage.removeItem('userDisplayName');
+          if (typeof window.showToast === 'function') {
+            window.showToast('Çıkış yapıldı', 'success');
+          }
+          if (typeof window.renderApp === 'function') window.renderApp();
+        }
+      } catch (err) {
+        console.error('❌ Çıkış hatası:', err);
+        if (typeof window.showToast === 'function') {
+          window.showToast('Çıkış hatası: ' + err.message, 'error');
+        }
+      }
+    };
+  </script>
+ </head>
+ <body class="h-full">
+  <div id="app" class="w-full h-full overflow-auto"></div>
+  <script>
+    const defaultConfig = {
+      background_color: "#f0f4f8",
+      card_background: "#ffffff",
+      primary_color: "#2563eb",
+      text_color: "#1e293b",
+      success_color: "#10b981",
+      danger_color: "#ef4444",
+      font_family: "Plus Jakarta Sans",
+      font_size: 16,
+      app_title: "Gelir-Gider Takip",
+      balance_section_title: "Finansal Özet",
+      transaction_form_title: "Yeni İşlem Ekle",
+      reminder_form_title: "Yeni Hatırlatıcı",
+      transactions_list_title: "Hesap Dokümanlarım",
+      reminders_list_title: "Hatırlatıcılarım"
+    };
+
+    let allData = [];
+    let editingId = null;
+    let currentTab = 'islemler';
+    let isLoggedIn = false;
+    let localVerified = false; // Local login doğrulandı mı?
+
+    // Login credentials
+    const VALID_USERNAME = 'Aliş';
+    const VALID_PASSWORD = 'Atk252';
+
+    // Giriş durumu kontrol fonksiyonu
+    function checkLogin() {
+      // Firebase user varsa UID'yi sakla
+      if (window.firebaseReady && firebase.auth().currentUser) {
+        currentUserUID = firebase.auth().currentUser.uid;
+        isLoggedIn = true;
+        // Firestore'dan veri yükle
+        loadDataFromFirestore();
+      }
+    }
+
+    // Local login doğrulama
+    function handleLocalLogin(e) {
+      e.preventDefault();
+      const form = e.target;
+      const username = form.username.value;
+      const password = form.password.value;
+
+      if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+        localVerified = true;
+        showToast('Doğru! Şimdi Google ile oturum açın.', 'success');
+        renderApp();
+      } else {
+        showToast('Kullanıcı adı veya şifre hatalı!', 'error');
+      }
+    }
+
+    function handleLogout() {
+      // Firebase çıkış
+      if (window.firebaseSignOut) {
+        window.firebaseSignOut();
+      }
+      localVerified = false;
+      isLoggedIn = false;
+    }
+
+    // LocalStorage + Firestore functions
+    let currentUserUID = null;
+
+    function loadData() {
+      // Önce localStorage'dan yükle (offline mod için)
+      const stored = localStorage.getItem('gelirGiderData');
+      if (stored) {
+        allData = JSON.parse(stored);
+      }
+      
+      // Eğer user giriş yaptıysa Firestore'dan da yükle
+      if (window.firebaseReady && firebase.auth().currentUser) {
+        currentUserUID = firebase.auth().currentUser.uid;
+        loadDataFromFirestore();
+      }
+    }
+
+    function saveData() {
+      // Her zaman localStorage'a kaydet (backup)
+      localStorage.setItem('gelirGiderData', JSON.stringify(allData));
+      
+      // Eğer user giriş yaptıysa Firestore'a da kaydet
+      if (window.firebaseReady && firebase.auth().currentUser && currentUserUID) {
+        saveDataToFirestore();
+      }
+    }
+
+    // Firestore'dan veri yükle
+    function loadDataFromFirestore() {
+      if (!window.firebaseReady || !currentUserUID) {
+        console.log('⏭️ Firestore yükleme atlandı: ready=' + window.firebaseReady + ', uid=' + currentUserUID);
+        return;
+      }
+      
+      try {
+        const db = firebase.firestore();
+        db.collection('users').doc(currentUserUID).collection('data').get()
+          .then(querySnapshot => {
+            allData = [];
+            querySnapshot.forEach(doc => {
+              allData.push(doc.data());
+            });
+            console.log('✅ Firestore\'dan', allData.length, 'kayıt yüklendi');
+            if (typeof window.renderApp === 'function') window.renderApp();
+          })
+          .catch(err => {
+            console.error('❌ Firestore yükleme hatası:', err.code, err.message);
+            if (err.code === 'permission-denied') {
+              alert('⚠️ Firestore izin hatası!\n\nFirebase Console → Firestore → Rules sekmesinde şu kodu yapıştırın:\n\nrules_version = "2";\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /users/{userId}/** {\n      allow read, write: if request.auth.uid == userId;\n    }\n  }\n}');
+            }
+          });
+      } catch (err) {
+        console.error('❌ Firestore erişim hatası:', err);
+      }
+    }
+
+    // Firestore'a veri kaydet
+    function saveDataToFirestore() {
+      if (!window.firebaseReady || !currentUserUID) {
+        console.log('⏭️ Firestore kaydetme atlandı: ready=' + window.firebaseReady + ', uid=' + currentUserUID);
+        return;
+      }
+      
+      try {
+        const db = firebase.firestore();
+        const userRef = db.collection('users').doc(currentUserUID);
+        
+        // Verileri toplu olarak kaydet (batch)
+        const batch = db.batch();
+        
+        // Eski verileri temizle
+        userRef.collection('data').get().then(snapshot => {
+          snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+          });
+          
+          // Yeni verileri ekle
+          allData.forEach(item => {
+            const newDoc = userRef.collection('data').doc();
+            batch.set(newDoc, item);
+          });
+          
+          // Batch işlemini gönder
+          batch.commit()
+            .then(() => console.log('✅', allData.length, 'kayıt Firestore\'a kaydedildi'))
+            .catch(err => {
+              console.error('❌ Firestore batch hatası:', err.code, err.message);
+              if (err.code === 'permission-denied') {
+                console.error('Firestore Rules ayarlanmadı!');
+              }
+            });
+        });
+      } catch (err) {
+        console.error('❌ Firestore save hatası:', err);
+      }
+    }
+
+    function getTransactions() {
+      return allData.filter(item => item.itemType === 'transaction');
+    }
+
+    function getReminders() {
+      return allData.filter(item => item.itemType === 'reminder');
+    }
+
+    function calculateTotals() {
+      const transactions = getTransactions();
+      const gelir = transactions
+        .filter(t => t.type === 'gelir')
+        .reduce((sum, t) => sum + t.tutar, 0);
+      const gider = transactions
+        .filter(t => t.type === 'gider')
+        .reduce((sum, t) => sum + t.tutar, 0);
+      const net = gelir - gider;
+      
+      return { gelir, gider, net };
+    }
+
+    function formatCurrency(amount) {
+      return new Intl.NumberFormat('tr-TR', {
+        style: 'currency',
+        currency: 'TRY'
+      }).format(amount);
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('tr-TR');
+    }
+
+    function handleTransactionSubmit(e) {
+      e.preventDefault();
+      
+      const form = e.target;
+      const formData = {
+        id: editingId || `txn_${Date.now()}`,
+        itemType: 'transaction',
+        type: form.type.value,
+        aciklama: form.aciklama.value,
+        tutar: parseFloat(form.tutar.value),
+        tarih: form.tarih.value,
+        kategori: form.kategori.value,
+        createdAt: new Date().toISOString()
+      };
+
+      if (editingId) {
+        const index = allData.findIndex(item => item.id === editingId);
+        if (index !== -1) {
+          allData[index] = formData;
+        }
+        editingId = null;
+      } else {
+        allData.push(formData);
+      }
+
+      saveData();
+      form.reset();
+      renderApp();
+      showToast('İşlem başarıyla kaydedildi!', 'success');
+    }
+
+    function handleReminderSubmit(e) {
+      e.preventDefault();
+      
+      const form = e.target;
+      const formData = {
+        id: `rem_${Date.now()}`,
+        itemType: 'reminder',
+        aciklama: form.rem_aciklama.value,
+        tarih: form.rem_tarih.value,
+        saat: form.rem_saat.value,
+        createdAt: new Date().toISOString()
+      };
+
+      allData.push(formData);
+      saveData();
+      form.reset();
+      renderApp();
+      showToast('Hatırlatıcı oluşturuldu! Firestore\'a kaydedildi.', 'success');
+    }
+
+    function deleteItem(itemId) {
+      const deleteBtn = document.querySelector(`[data-delete-id="${itemId}"]`);
+      if (!deleteBtn) return;
+
+      const originalText = deleteBtn.innerHTML;
+      const config = window.elementSdk?.config || defaultConfig;
+      deleteBtn.innerHTML = 'Emin misiniz?';
+      deleteBtn.style.backgroundColor = config.danger_color;
+      deleteBtn.style.opacity = '0.8';
+
+      const confirmDelete = () => {
+        allData = allData.filter(item => item.id !== itemId);
+        saveData();
+        renderApp();
+        showToast('Silindi!', 'success');
+      };
+
+      const cancelDelete = () => {
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.style.opacity = '1';
+        deleteBtn.onclick = () => deleteItem(itemId);
+      };
+
+      deleteBtn.onclick = confirmDelete;
+
+      setTimeout(cancelDelete, 3000);
+    }
+
+    function editTransaction(itemId) {
+      const item = allData.find(i => i.id === itemId);
+      if (!item) return;
+
+      editingId = item.id;
+      const form = document.getElementById('transactionForm');
+      form.aciklama.value = item.aciklama;
+      form.tutar.value = item.tutar;
+      form.tarih.value = item.tarih;
+      form.type.value = item.type;
+      form.kategori.value = item.kategori;
+      
+      document.getElementById('submitBtn').textContent = '✏️ Güncelle';
+      form.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function showToast(message, type) {
+      const config = window.elementSdk?.config || defaultConfig;
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        background: ${type === 'success' ? config.success_color : config.danger_color};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        font-size: ${config.font_size}px;
+        font-family: ${config.font_family}, sans-serif;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      renderApp();
+    }
+
+    function renderApp() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      app.style.backgroundColor = config.background_color;
+      app.style.fontFamily = `${config.font_family}, sans-serif`;
+      const baseSize = config.font_size;
+
+      // Show login screen if not logged in
+      if (!isLoggedIn) {
+        app.innerHTML = `
+          <div style="min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px;">
+            <div style="background: ${config.card_background}; padding: 48px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); max-width: 450px; width: 100%;">
+              <div style="text-align: center; margin-bottom: 40px;">
+                <div style="font-size: ${baseSize * 3.5}px; margin-bottom: 16px;">💰</div>
+                <h1 style="font-size: ${baseSize * 2}px; font-weight: 700; color: ${config.text_color}; margin-bottom: 8px;">
+                  ${config.app_title}
+                </h1>
+                <p style="font-size: ${baseSize}px; color: ${config.text_color}; opacity: 0.6;">
+                  Devam etmek için giriş yapın
+                </p>
+              </div>
+
+              ${!localVerified ? `
+                <!-- AŞAMA 1: Kullanıcı Adı/Şifre -->
+                <form id="localLoginForm" style="display: flex; flex-direction: column; gap: 20px;">
+                  <div>
+                    <label style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                      Kullanıcı Adı
+                    </label>
+                    <input 
+                      type="text" 
+                      name="username" 
+                      required
+                      autocomplete="username"
+                      style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color}; box-sizing: border-box;"
+                    />
+                  </div>
+
+                  <div>
+                    <label style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                      Şifre
+                    </label>
+                    <input 
+                      type="password" 
+                      name="password" 
+                      required
+                      autocomplete="current-password"
+                      style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color}; box-sizing: border-box;"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    style="width: 100%; padding: 12px; background: ${config.primary_color}; color: white; border: none; border-radius: 8px; font-size: ${baseSize}px; font-weight: 600; cursor: pointer; font-family: ${config.font_family}, sans-serif;"
+                  >
+                    🔐 İleri Git
+                  </button>
+                </form>
+              ` : `
+                <!-- AŞAMA 2: Google ile Oturum Açma -->
+                <form id="googleLoginForm" style="display: flex; flex-direction: column; gap: 20px;">
+                  <p style="font-size: ${baseSize * 0.95}px; color: ${config.text_color}; margin: 0; text-align: center; padding: 16px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                    ✅ Doğrulama başarılı! Şimdi Google ile oturum açın.
+                  </p>
+                  
+                  <button 
+                    id="googleSignInBtn" 
+                    type="button" 
+                    onclick="window.googleSignIn && window.googleSignIn()" 
+                    style="width:100%; padding:14px; background:#DB4437; color:white; border:none; border-radius:8px; font-size:${baseSize}px; font-weight:600; cursor:pointer; font-family: ${config.font_family}, sans-serif;">
+                    🟢 Google ile Oturum Aç
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onclick="(() => { localVerified = false; renderApp && renderApp(); })()"
+                    style="width:100%; padding:10px; background: ${config.text_color}; opacity: 0.2; color: ${config.text_color}; border:none; border-radius:8px; font-size:${baseSize * 0.85}px; cursor:pointer; font-family: ${config.font_family}, sans-serif;"
+                  >
+                    ← Geri Dön
+                  </button>
+                  
+                  <div id="googleErrorMsg" style="display:none; padding:12px; background:#fee; border:1px solid #f99; border-radius:6px; color:#c33; font-size:${baseSize * 0.9}px; white-space:pre-wrap; font-family:monospace;"></div>
+                </form>
+              `}
+
+              <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(0,0,0,0.1); text-align: center;">
+                <p style="font-size: ${baseSize * 0.85}px; color: ${config.text_color}; opacity: 0.5;">
+                  Verileriniz Google hesabınız ile Firebase'de güvenli şekilde saklanır
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const localLoginForm = document.getElementById('localLoginForm');
+        if (localLoginForm) {
+          localLoginForm.onsubmit = handleLocalLogin;
+        }
+        return;
+      }
+
+      // Main app content (when logged in)
+      const { gelir, gider, net } = calculateTotals();
+      const transactions = getTransactions();
+      const reminders = getReminders();
+
+      app.innerHTML = `
+        <div style="max-width: 1400px; margin: 0 auto; padding: 32px 24px;">
+          <!-- Header -->
+          <header style="text-align: center; margin-bottom: 40px; position: relative;">
+            <h1 style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${config.text_color}; margin-bottom: 8px;">
+              💰 ${config.app_title}
+            </h1>
+            <p style="font-size: ${baseSize * 1.1}px; color: ${config.text_color}; opacity: 0.7;">
+              Finansal işlemlerinizi kolayca yönetin
+            </p>
+            <button 
+              onclick="handleLogout()"
+              style="position: absolute; top: 0; right: 0; padding: 10px 20px; background: ${config.danger_color}; color: white; border: none; border-radius: 8px; font-size: ${baseSize * 0.9}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+            >
+              🚪 Çıkış
+            </button>
+          </header>
+
+          <!-- Balance Cards -->
+          <div style="margin-bottom: 40px;">
+            <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 20px;">
+              ${config.balance_section_title}
+            </h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+              <div class="balance-card" style="background: ${config.card_background}; padding: 24px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <div style="font-size: ${baseSize * 0.9}px; color: ${config.text_color}; opacity: 0.7; margin-bottom: 8px; font-weight: 500;">
+                  Toplam Gelir
+                </div>
+                <div style="font-size: ${baseSize * 1.8}px; font-weight: 700; color: ${config.success_color};">
+                  ${formatCurrency(gelir)}
+                </div>
+              </div>
+              
+              <div class="balance-card" style="background: ${config.card_background}; padding: 24px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <div style="font-size: ${baseSize * 0.9}px; color: ${config.text_color}; opacity: 0.7; margin-bottom: 8px; font-weight: 500;">
+                  Toplam Gider
+                </div>
+                <div style="font-size: ${baseSize * 1.8}px; font-weight: 700; color: ${config.danger_color};">
+                  ${formatCurrency(gider)}
+                </div>
+              </div>
+              
+              <div class="balance-card" style="background: ${config.card_background}; padding: 24px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <div style="font-size: ${baseSize * 0.9}px; color: ${config.text_color}; opacity: 0.7; margin-bottom: 8px; font-weight: 500;">
+                  Net Bakiye
+                </div>
+                <div style="font-size: ${baseSize * 1.8}px; font-weight: 700; color: ${net >= 0 ? config.success_color : config.danger_color};">
+                  ${formatCurrency(net)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div style="margin-bottom: 32px; border-bottom: 2px solid rgba(0,0,0,0.1);">
+            <div style="display: flex; gap: 8px;">
+              <button 
+                class="tab-button ${currentTab === 'islemler' ? 'active' : ''}"
+                onclick="switchTab('islemler')"
+                style="padding: 12px 24px; background: none; border: none; font-size: ${baseSize * 1.1}px; font-weight: 600; color: ${currentTab === 'islemler' ? config.primary_color : config.text_color}; cursor: pointer; opacity: ${currentTab === 'islemler' ? '1' : '0.6'}; font-family: ${config.font_family}, sans-serif;"
+              >
+                📊 İşlemler
+              </button>
+              <button 
+                class="tab-button ${currentTab === 'hatirlaticilar' ? 'active' : ''}"
+                onclick="switchTab('hatirlaticilar')"
+                style="padding: 12px 24px; background: none; border: none; font-size: ${baseSize * 1.1}px; font-weight: 600; color: ${currentTab === 'hatirlaticilar' ? config.primary_color : config.text_color}; cursor: pointer; opacity: ${currentTab === 'hatirlaticilar' ? '1' : '0.6'}; font-family: ${config.font_family}, sans-serif;"
+              >
+                🔔 Hatırlatıcılar
+              </button>
+            </div>
+          </div>
+
+          ${currentTab === 'islemler' ? `
+            <!-- Transaction Form -->
+            <div style="background: ${config.card_background}; padding: 32px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 40px;">
+              <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 24px;">
+                ${config.transaction_form_title}
+              </h2>
+              <form id="transactionForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div>
+                  <label for="aciklama" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Açıklama
+                  </label>
+                  <input 
+                    type="text" 
+                    id="aciklama"
+                    name="aciklama" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div>
+                  <label for="tutar" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Tutar (₺)
+                  </label>
+                  <input 
+                    type="number" 
+                    id="tutar"
+                    name="tutar" 
+                    step="0.01"
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div>
+                  <label for="tarih" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Tarih
+                  </label>
+                  <input 
+                    type="date" 
+                    id="tarih"
+                    name="tarih" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div>
+                  <label for="type" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Tür
+                  </label>
+                  <select 
+                    id="type"
+                    name="type" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color}; background: white;"
+                  >
+                    <option value="gelir">💰 Gelir</option>
+                    <option value="gider">💸 Gider</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="kategori" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Kategori
+                  </label>
+                  <select 
+                    id="kategori"
+                    name="kategori" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color}; background: white;"
+                  >
+                    <option value="Maaş">Maaş</option>
+                    <option value="Kredi">Kredi</option>
+                    <option value="Kredi Kartı">Kredi Kartı</option>
+                    <option value="Market">Market</option>
+                    <option value="Ulaşım">Ulaşım</option>
+                    <option value="Faturalar">Faturalar</option>
+                    <option value="Sağlık">Sağlık</option>
+                    <option value="İstek">İstek</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: flex-end;">
+                  <button 
+                    type="submit" 
+                    id="submitBtn"
+                    class="btn-primary"
+                    style="width: 100%; padding: 12px 24px; background: ${config.primary_color}; color: white; border: none; border-radius: 8px; font-size: ${baseSize}px; font-weight: 600; cursor: pointer; font-family: ${config.font_family}, sans-serif;"
+                  >
+                    ${editingId ? '✏️ Güncelle' : '💾 Kaydet'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Transactions List -->
+            <div style="background: ${config.card_background}; padding: 32px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+              <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 24px;">
+                ${config.transactions_list_title}
+              </h2>
+              ${transactions.length === 0 ? `
+                <p style="text-align: center; color: ${config.text_color}; opacity: 0.6; font-size: ${baseSize}px; padding: 40px 0;">
+                  Henüz işlem bulunmuyor. Yukarıdaki formu kullanarak yeni işlem ekleyin.
+                </p>
+              ` : `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  ${transactions.sort((a, b) => new Date(b.tarih) - new Date(a.tarih)).map(item => `
+                    <div class="transaction-item" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 2px solid rgba(0,0,0,0.06); border-radius: 12px; flex-wrap: wrap; gap: 12px;">
+                      <div style="flex: 1; min-width: 200px;">
+                        <div style="font-size: ${baseSize * 1.1}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 4px;">
+                          ${item.aciklama}
+                        </div>
+                        <div style="font-size: ${baseSize * 0.85}px; color: ${config.text_color}; opacity: 0.7;">
+                          ${item.kategori} • ${formatDate(item.tarih)}
+                        </div>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="font-size: ${baseSize * 1.3}px; font-weight: 700; color: ${item.type === 'gelir' ? config.success_color : config.danger_color};">
+                          ${item.type === 'gelir' ? '+' : '-'} ${formatCurrency(item.tutar)}
+                        </div>
+                        <button 
+                          onclick="editTransaction('${item.id}')"
+                          style="padding: 8px 16px; background: ${config.primary_color}; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+                        >
+                          ✏️ Düzenle
+                        </button>
+                        <button 
+                          data-delete-id="${item.id}"
+                          onclick="deleteItem('${item.id}')"
+                          style="padding: 8px 16px; background: ${config.danger_color}; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+                        >
+                          🗑️ Sil
+                        </button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+          ` : `
+            <!-- Reminder Form -->
+            <div style="background: ${config.card_background}; padding: 32px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 40px;">
+              <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 24px;">
+                ${config.reminder_form_title}
+              </h2>
+              <form id="reminderForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div>
+                  <label for="rem_aciklama" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Açıklama
+                  </label>
+                  <input 
+                    type="text" 
+                    id="rem_aciklama"
+                    name="rem_aciklama" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div>
+                  <label for="rem_tarih" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Tarih
+                  </label>
+                  <input 
+                    type="date" 
+                    id="rem_tarih"
+                    name="rem_tarih" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div>
+                  <label for="rem_saat" style="display: block; font-size: ${baseSize * 0.9}px; font-weight: 500; color: ${config.text_color}; margin-bottom: 8px;">
+                    Saat
+                  </label>
+                  <input 
+                    type="time" 
+                    id="rem_saat"
+                    name="rem_saat" 
+                    required
+                    style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color};"
+                  />
+                </div>
+
+                <div style="display: flex; align-items: flex-end;">
+                  <button 
+                    type="submit"
+                    class="btn-primary"
+                    style="width: 100%; padding: 12px 24px; background: ${config.primary_color}; color: white; border: none; border-radius: 8px; font-size: ${baseSize}px; font-weight: 600; cursor: pointer; font-family: ${config.font_family}, sans-serif;"
+                  >
+                    🔔 Kaydet
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Reminders List -->
+            <div style="background: ${config.card_background}; padding: 32px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+              <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 24px;">
+                ${config.reminders_list_title}
+              </h2>
+              ${reminders.length === 0 ? `
+                <p style="text-align: center; color: ${config.text_color}; opacity: 0.6; font-size: ${baseSize}px; padding: 40px 0;">
+                  Henüz hatırlatıcı bulunmuyor. Yukarıdaki formu kullanarak yeni hatırlatıcı ekleyin.
+                </p>
+              ` : `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                  ${reminders.sort((a, b) => new Date(a.tarih + ' ' + a.saat) - new Date(b.tarih + ' ' + b.saat)).map(item => `
+                    <div class="transaction-item" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 2px solid rgba(0,0,0,0.06); border-radius: 12px; flex-wrap: wrap; gap: 12px;">
+                      <div style="flex: 1; min-width: 200px;">
+                        <div style="font-size: ${baseSize * 1.1}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 4px;">
+                          ${item.aciklama}
+                        </div>
+                        <div style="font-size: ${baseSize * 0.85}px; color: ${config.text_color}; opacity: 0.7;">
+                          📅 ${formatDate(item.tarih)} • 🕐 ${item.saat}
+                        </div>
+                      </div>
+                      <button 
+                        data-delete-id="${item.id}"
+                        onclick="deleteItem('${item.id}')"
+                        style="padding: 8px 16px; background: ${config.danger_color}; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+                      >
+                        🗑️ Sil
+                      </button>
+                    </div>
+                  `).join('')}
+                </div>
+              `}
+            </div>
+          `}
+        </div>
+      `;
+
+      // Attach event listeners
+      if (currentTab === 'islemler') {
+        const transactionForm = document.getElementById('transactionForm');
+        if (transactionForm) {
+          transactionForm.onsubmit = handleTransactionSubmit;
+        }
+      } else {
+        const reminderForm = document.getElementById('reminderForm');
+        if (reminderForm) {
+          reminderForm.onsubmit = handleReminderSubmit;
+        }
+      }
+
+      // Update active tab styling
+      const afterStyle = document.createElement('style');
+      afterStyle.textContent = `.tab-button.active::after { background-color: ${config.primary_color}; }`;
+      if (!document.getElementById('tab-style')) {
+        afterStyle.id = 'tab-style';
+        document.head.appendChild(afterStyle);
+      } else {
+        document.getElementById('tab-style').textContent = `.tab-button.active::after { background-color: ${config.primary_color}; }`;
+      }
+    }
+
+    async function onConfigChange(config) {
+      renderApp();
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.card_background || defaultConfig.card_background,
+              set: (value) => {
+                config.card_background = value;
+                window.elementSdk.setConfig({ card_background: value });
+              }
+            },
+            {
+              get: () => config.primary_color || defaultConfig.primary_color,
+              set: (value) => {
+                config.primary_color = value;
+                window.elementSdk.setConfig({ primary_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.success_color || defaultConfig.success_color,
+              set: (value) => {
+                config.success_color = value;
+                window.elementSdk.setConfig({ success_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ['app_title', config.app_title || defaultConfig.app_title],
+          ['balance_section_title', config.balance_section_title || defaultConfig.balance_section_title],
+          ['transaction_form_title', config.transaction_form_title || defaultConfig.transaction_form_title],
+          ['reminder_form_title', config.reminder_form_title || defaultConfig.reminder_form_title],
+          ['transactions_list_title', config.transactions_list_title || defaultConfig.transactions_list_title],
+          ['reminders_list_title', config.reminders_list_title || defaultConfig.reminders_list_title]
+        ])
+      });
+    }
+
+    // Initialize app
+    checkLogin();
+    loadData();
+    renderApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
