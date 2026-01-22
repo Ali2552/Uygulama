@@ -570,6 +570,50 @@
       form.scrollIntoView({ behavior: 'smooth' });
     }
 
+    function exportToExcel() {
+      const transactions = getTransactions();
+      
+      if (transactions.length === 0) {
+        showToast('Dışa aktarılacak işlem yok!', 'error');
+        return;
+      }
+
+      // CSV başlıkları
+      const headers = ['Açıklama', 'Tür', 'Kategori', 'Tutar (₺)', 'Tarih'];
+      
+      // CSV verileri
+      const rows = transactions.map(t => [
+        `"${t.aciklama}"`,
+        t.type === 'gelir' ? 'Gelir' : 'Gider',
+        `"${t.kategori}"`,
+        t.tutar,
+        formatDate(t.tarih)
+      ]);
+
+      // CSV içeriğini oluştur
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      // UTF-8 BOM ekle (Excel'de Türkçe karakterler düzgün görünsün)
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      // İndirme linkini oluştur
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `islemler_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast('İşlemler Excel\'e aktarıldı!', 'success');
+    }
+   
     function showToast(message, type) {
       const config = window.elementSdk?.config || defaultConfig;
       const toast = document.createElement('div');
@@ -853,6 +897,7 @@
                     style="width: 100%; padding: 12px; border: 2px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: ${baseSize}px; font-family: ${config.font_family}, sans-serif; color: ${config.text_color}; background: white;"
                   >
                     <option value="Maaş">Maaş</option>
+                    <option value="Harçlıks">Harçlık</option>
                     <option value="Kredi">Kredi</option>
                     <option value="Kredi Kartı">Kredi Kartı</option>
                     <option value="Market">Market</option>
@@ -878,9 +923,14 @@
 
             <!-- Transactions List -->
             <div style="background: ${config.card_background}; padding: 32px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-              <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 24px;">
-                ${config.transactions_list_title}
-              </h2>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin: 0;">
+                  ${config.transactions_list_title}
+                </h2>
+                <button id="exportButton" onclick="exportToExcel()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: ${baseSize * 0.95}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 600;">
+                  📊 Excel Aktar
+                </button>
+              </div>
               ${transactions.length === 0 ? `
                 <p style="text-align: center; color: ${config.text_color}; opacity: 0.6; font-size: ${baseSize}px; padding: 40px 0;">
                   Henüz işlem bulunmuyor. Yukarıdaki formu kullanarak yeni işlem ekleyin.
@@ -1117,5 +1167,7 @@
     loadData();
     renderApp();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
 </html>
+
