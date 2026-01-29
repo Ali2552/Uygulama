@@ -303,6 +303,7 @@
     let editingId = null;
     let currentTab = 'islemler';
     let isLoggedIn = false;
+    let selectedMonth = 'all';
     let localVerified = false; // Local login doğrulandı mı?
 
     // Login credentials
@@ -450,12 +451,13 @@
       return allData.filter(item => item.itemType === 'reminder');
     }
 
-    function calculateTotals() {
+    function calculateTotals(month) {
       const transactions = getTransactions();
-      const gelir = transactions
+      const filtered = month && month !== 'all' ? transactions.filter(t => t.tarih && t.tarih.slice(0,7) === month) : transactions;
+      const gelir = filtered
         .filter(t => t.type === 'gelir')
         .reduce((sum, t) => sum + t.tutar, 0);
-      const gider = transactions
+      const gider = filtered
         .filter(t => t.type === 'gider')
         .reduce((sum, t) => sum + t.tutar, 0);
       const net = gelir - gider;
@@ -463,6 +465,19 @@
       return { gelir, gider, net };
     }
 
+    function getUniqueMonths() {
+      const months = Array.from(new Set(getTransactions().map(t => (t.tarih || '').slice(0,7)).filter(Boolean)));
+      return months.sort((a, b) => b.localeCompare(a));
+    }
+
+    function getMonthLabel(monthStr) {
+      if (!monthStr) return '';
+      const [y, m] = monthStr.split('-');
+      const names = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+      const mm = parseInt(m, 10) - 1;
+      return `${y} ${names[mm] || m}`;
+    }
+     
     function formatCurrency(amount) {
       return new Intl.NumberFormat('tr-TR', {
         style: 'currency',
@@ -571,7 +586,7 @@
     }
 
     function exportToExcel() {
-      const transactions = getTransactions();
+      const transactions = selectedMonth === 'all' ? getTransactions() : getTransactions().filter(t => t.tarih && t.tarih.slice(0,7) === selectedMonth);
       
       if (transactions.length === 0) {
         showToast('Dışa aktarılacak işlem yok!', 'error');
@@ -747,8 +762,15 @@
       }
 
       // Main app content (when logged in)
-      const { gelir, gider, net } = calculateTotals();
+      const months = getUniqueMonths();
+      const monthOptionsHtml = ['<option value="all"' + (selectedMonth === 'all' ? ' selected' : '') + '>Tümü</option>', ...months.map(m => `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${getMonthLabel(m)}</option>`)].join('');
+      const monthFiltered = calculateTotals(selectedMonth);
+      const allMonths = calculateTotals('all');
+      const gelir = monthFiltered.gelir;
+      const gider = monthFiltered.gider;
+      const net = allMonths.net;
       const transactions = getTransactions();
+      const filteredTransactions = selectedMonth === 'all' ? transactions : transactions.filter(t => t.tarih && t.tarih.slice(0,7) === selectedMonth);
       const reminders = getReminders();
 
       app.innerHTML = `
@@ -769,6 +791,14 @@
             </button>
           </header>
 
+          <!-- Month Filter -->
+          <div style="display:flex; justify-content:flex-end; margin-bottom:12px; gap:12px; align-items:center;">
+            <label style="font-size:14px; color:${config.text_color}; opacity:0.8;">Ay Filtrele:</label>
+            <select id="monthFilter" onchange="(function(){ selectedMonth = this.value; renderApp(); }).call(this)" style="padding:8px 12px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); font-size:${baseSize}px;">
+              ${monthOptionsHtml}
+            </select>
+          </div>
+          
           <!-- Balance Cards -->
           <div style="margin-bottom: 40px;">
             <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 20px;">
@@ -931,13 +961,13 @@
                   📊 Excel Aktar
                 </button>
               </div>
-              ${transactions.length === 0 ? `
+              ${filteredTransactions.length === 0 ? `
                 <p style="text-align: center; color: ${config.text_color}; opacity: 0.6; font-size: ${baseSize}px; padding: 40px 0;">
                   Henüz işlem bulunmuyor. Yukarıdaki formu kullanarak yeni işlem ekleyin.
                 </p>
               ` : `
                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                  ${transactions.sort((a, b) => new Date(b.tarih) - new Date(a.tarih)).map(item => `
+                  ${filteredTransactions.sort((a, b) => new Date(b.tarih) - new Date(a.tarih)).map(item => `
                     <div class="transaction-item" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 2px solid rgba(0,0,0,0.06); border-radius: 12px; flex-wrap: wrap; gap: 12px;">
                       <div style="flex: 1; min-width: 200px;">
                         <div style="font-size: ${baseSize * 1.1}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 4px;">
@@ -1170,4 +1200,5 @@
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
+
 
