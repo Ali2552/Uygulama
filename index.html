@@ -87,6 +87,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     // Firebase başlatma kontrol ve yardımcı
     const firebaseConfig = {
@@ -609,38 +611,24 @@
         return;
       }
 
-      // CSV başlıkları
-      const headers = ['Açıklama', 'Tür', 'Kategori', 'Tutar (₺)', 'Tarih'];
-      
-      // CSV verileri
-      const rows = transactions.map(t => [
-        `"${t.aciklama}"`,
-        t.type === 'gelir' ? 'Gelir' : 'Gider',
-        `"${t.kategori}"`,
-        t.tutar,
-        formatDate(t.tarih)
-      ]);
+      // Verileri hazırla
+      const data = transactions.map(t => ({
+        'Açıklama': t.aciklama,
+        'Tür': t.type === 'gelir' ? 'Gelir' : 'Gider',
+        'Kategori': t.kategori,
+        'Tutar (₺)': t.tutar,
+        'Tarih': formatDate(t.tarih)
+      }));
 
-      // CSV içeriğini oluştur
-      const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n');
+      // Worksheet oluştur
+      const ws = XLSX.utils.json_to_sheet(data);
 
-      // UTF-8 BOM ekle (Excel'de Türkçe karakterler düzgün görünsün)
-      const BOM = '\uFEFF';
-      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-      
-      // İndirme linkini oluştur
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `islemler_${new Date().toISOString().slice(0, 10)}.csv`);
-      link.style.visibility = 'hidden';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Workbook oluştur
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'İşlemler');
+
+      // Excel dosyasını indir
+      XLSX.writeFile(wb, `islemler_${new Date().toISOString().slice(0, 10)}.xlsx`);
       
       showToast('İşlemler Excel\'e aktarıldı!', 'success');
     }
