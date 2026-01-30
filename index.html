@@ -461,7 +461,7 @@
         .filter(t => t.type === 'gider')
         .reduce((sum, t) => sum + t.tutar, 0);
       const net = gelir - gider;
-      
+
       return { gelir, gider, net };
     }
 
@@ -477,7 +477,7 @@
       const mm = parseInt(m, 10) - 1;
       return `${y} ${names[mm] || m}`;
     }
-     
+
     function formatCurrency(amount) {
       return new Intl.NumberFormat('tr-TR', {
         style: 'currency',
@@ -539,6 +539,22 @@
       form.reset();
       renderApp();
       showToast('Hatırlatıcı oluşturuldu! Firestore\'a kaydedildi.', 'success');
+    }
+
+    function addToGoogleCalendar(title, date, time) {
+      // Tarih ve saati formatla: YYYYMMDDTHHMMSSZ
+      const dateTime = new Date(date + 'T' + time);
+      const startDateTime = dateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '') + 'Z';
+      
+      // End time: start + 1 hour
+      const endDateTime = new Date(dateTime.getTime() + 60 * 60 * 1000);
+      const endDateTimeStr = endDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '') + 'Z';
+      
+      // Google Calendar URL oluştur
+      const url = `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTimeStr}&details=${encodeURIComponent('Hatırlatıcı: ' + title)}`;
+      
+      // Yeni sekmede aç
+      window.open(url, '_blank');
     }
 
     function deleteItem(itemId) {
@@ -628,7 +644,7 @@
       
       showToast('İşlemler Excel\'e aktarıldı!', 'success');
     }
-   
+
     function showToast(message, type) {
       const config = window.elementSdk?.config || defaultConfig;
       const toast = document.createElement('div');
@@ -798,7 +814,7 @@
               ${monthOptionsHtml}
             </select>
           </div>
-          
+
           <!-- Balance Cards -->
           <div style="margin-bottom: 40px;">
             <h2 style="font-size: ${baseSize * 1.5}px; font-weight: 600; color: ${config.text_color}; margin-bottom: 20px;">
@@ -1205,9 +1221,6 @@
     loadData();
     renderApp();
   </script>
-  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
-
-
-
