@@ -1079,13 +1079,21 @@
                           📅 ${formatDate(item.tarih)} • 🕐 ${item.saat}
                         </div>
                       </div>
-                      <button 
-                        data-delete-id="${item.id}"
-                        onclick="deleteItem('${item.id}')"
-                        style="padding: 8px 16px; background: ${config.danger_color}; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
-                      >
-                        🗑️ Sil
-                      </button>
+                      <div style="display: flex; gap: 8px;">
+                        <button 
+                          onclick="addToGoogleCalendar('${item.aciklama}', '${item.tarih}', '${item.saat}')"
+                          style="padding: 8px 16px; background: #4285f4; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+                        >
+                          📅 Takvim'e Ekle
+                        </button>
+                        <button 
+                          data-delete-id="${item.id}"
+                          onclick="deleteItem('${item.id}')"
+                          style="padding: 8px 16px; background: ${config.danger_color}; color: white; border: none; border-radius: 6px; font-size: ${baseSize * 0.85}px; cursor: pointer; font-family: ${config.font_family}, sans-serif; font-weight: 500;"
+                        >
+                          🗑️ Sil
+                        </button>
+                      </div>
                     </div>
                   `).join('')}
                 </div>
@@ -1200,5 +1208,6 @@
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c0934c5f544e333',t:'MTc2ODg1NTg0NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
+
 
 
